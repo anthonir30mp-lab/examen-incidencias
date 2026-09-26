@@ -1,10 +1,17 @@
 @model IEnumerable<examen_incidencias.Models.Incidencia>
 
 @{
-    ViewData["Title"] = "Incidencias abiertas";
+    ViewData["Title"] = "Incidencias abiertas encontradas";
 }
 
-<h1>Incidencias abiertas</h1>
+<h1>Incidencias abiertas encontradas</h1>
+
+<form method="get" asp-action="Incidencias" asp-controller="Operaciones" class="mb-3">
+    <div class="input-group">
+        <input type="text" name="query" class="form-control" placeholder="Buscar incidencias..." value="@ViewBag.Query" />
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
+</form>
 
 <table class="table table-striped">
     <thead>
