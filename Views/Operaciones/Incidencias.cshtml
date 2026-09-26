@@ -1,0 +1,49 @@
+@model IEnumerable<examen_incidencias.Models.Incidencia>
+
+@{
+    ViewData["Title"] = "Incidencias abiertas";
+}
+
+<h1>Incidencias abiertas</h1>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Estación</th>
+            <th>Descripción</th>
+            <th>Prioridad</th>
+            <th>Fecha de Creación</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var incidencia in Model)
+        {
+            <tr>
+                <td>@incidencia.Estacion</td>
+                <td>@incidencia.Descripcion</td>
+                <td>
+                    @if (incidencia.Prioridad == examen_incidencias.Models.Prioridad.Alta)
+                    {
+                        <span class="badge bg-danger">Alta</span>
+                    }
+                    else if (incidencia.Prioridad == examen_incidencias.Models.Prioridad.Media)
+                    {
+                        <span class="badge bg-warning text-dark">Media</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success">Baja</span>
+                    }
+                </td>
+                <td>@incidencia.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</td>
+                <td>
+                    <form asp-action="CerrarIncidencia" asp-controller="Operaciones" method="post">
+                        <input type="hidden" name="id" value="@incidencia.Id" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Cerrar</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
