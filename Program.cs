@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using examen_incidencias.Data;
 using examen_incidencias.Models;
+using examen_incidencias.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,11 +16,15 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.Requ
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddControllersWithViews();
+builder.Services.AddSingleton<AlgoliaService>();
 
 var app = builder.Build();
 
 // Seed data
 await SeedDataAsync(app.Services);
+
+// Sincronizar índice de Algolia con datos del seed (solo si está vacío)
+await SyncAlgoliaIndexAsync(app.Services);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -133,5 +138,21 @@ static async Task SeedDataAsync(IServiceProvider serviceProvider)
         );
 
         await context.SaveChangesAsync();
+    }
+}
+
+// --- Algolia Sync ---
+static async Task SyncAlgoliaIndexAsync(IServiceProvider serviceProvider)
+{
+    using var scope = serviceProvider.CreateScope();
+    var services = scope.ServiceProvider;
+
+    var algolia = services.GetRequiredService<AlgoliaService>();
+    var context = services.GetRequiredService<ApplicationDbContext>();
+
+    if (await algolia.IsIndexEmptyAsync())
+    {
+        var incidencias = await context.Incidencias.ToListAsync();
+        await algolia.SyncIncidenciasAsync(incidencias);
     }
 }
