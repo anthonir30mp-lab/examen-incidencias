@@ -16,6 +16,22 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.Requ
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddControllersWithViews();
 
+// Configurar Redis como caché distribuida
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrEmpty(redisConnectionString))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "examen_incidencias:";
+    });
+}
+else
+{
+    // Fallback: usar caché en memoria si no hay connection string de Redis
+    builder.Services.AddDistributedMemoryCache();
+}
+
 var app = builder.Build();
 
 // Seed data
