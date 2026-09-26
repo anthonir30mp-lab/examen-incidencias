@@ -1,10 +1,10 @@
 @model IEnumerable<examen_incidencias.Models.Incidencia>
 
 @{
-    ViewData["Title"] = "Incidencias abiertas encontradas";
+    ViewData["Title"] = "Incidencias abiertas en tiempo real";
 }
 
-<h1>Incidencias abiertas con consulta rápida</h1>
+<h1>Incidencias abiertas en tiempo real</h1>
 
 <form method="get" asp-action="Incidencias" asp-controller="Operaciones" class="mb-3">
     <div class="input-group">
@@ -13,44 +13,109 @@
     </div>
 </form>
 
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Estación</th>
-            <th>Descripción</th>
-            <th>Prioridad</th>
-            <th>Fecha de Creación</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var incidencia in Model)
-        {
-            <tr>
-                <td>@incidencia.Estacion</td>
-                <td>@incidencia.Descripcion</td>
-                <td>
-                    @if (incidencia.Prioridad == examen_incidencias.Models.Prioridad.Alta)
-                    {
-                        <span class="badge bg-danger">Alta</span>
+<div id="connection-status" class="mb-3">
+    <span class="badge bg-secondary">⏳ Conectando...</span>
+</div>
+
+<div id="tabla-incidencias">
+    @await Html.PartialAsync("_TablaIncidencias", Model)
+</div>
+
+@section Scripts {
+    <script src="https://unpkg.com/piesocket-js@7"></script>
+    <script>
+        (function () {
+            const clusterId = '@Html.Raw(ViewBag.PieSocketClusterId)';
+            const apiKey = '@Html.Raw(ViewBag.PieSocketApiKey)';
+            const statusEl = document.getElementById('connection-status');
+
+            function setStatus(text, bgClass) {
+                statusEl.innerHTML = '<span class="badge ' + bgClass + '">' + text + '</span>';
+            }
+
+            async function recargarTabla() {
+                try {
+                    const response = await fetch('@Url.Action("Incidencias", "Operaciones")', {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (response.ok) {
+                        const html = await response.text();
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const nuevaTabla = doc.getElementById('tabla-incidencias');
+                        if (nuevaTabla) {
+                            document.getElementById('tabla-incidencias').innerHTML = nuevaTabla.innerHTML;
+                        }
                     }
-                    else if (incidencia.Prioridad == examen_incidencias.Models.Prioridad.Media)
-                    {
-                        <span class="badge bg-warning text-dark">Media</span>
+                } catch (err) {
+                    console.error('Error al recargar tabla:', err);
+                }
+            }
+
+            let wasDisconnected = false;
+
+            async function conectar() {
+                const piesocket = new PieSocket.default({
+                    clusterId: clusterId,
+                    apiKey: apiKey
+                });
+
+                try {
+                    const channel = await piesocket.subscribe('incidencias');
+
+                    setStatus('🟢 Conectado en tiempo real', 'bg-success');
+                    
+                    if (wasDisconnected) {
+                        wasDisconnected = false;
+                        await recargarTabla();
                     }
-                    else
-                    {
-                        <span class="badge bg-success">Baja</span>
-                    }
-                </td>
-                <td>@incidencia.FechaCreacion.ToString("dd/MM/yyyy HH:mm")</td>
-                <td>
-                    <form asp-action="CerrarIncidencia" asp-controller="Operaciones" method="post">
-                        <input type="hidden" name="id" value="@incidencia.Id" />
-                        <button type="submit" class="btn btn-sm btn-outline-secondary">Cerrar</button>
-                    </form>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+
+                    channel.listen('message', function (data) {
+                        try {
+                            let mensaje = data;
+                            if (typeof data === 'string') {
+                                mensaje = JSON.parse(data);
+                            }
+                            if (data && typeof data.data === 'string') {
+                                mensaje = JSON.parse(data.data);
+                            }
+
+                            if (mensaje.tipo === 'IncidenciaActualizada' && mensaje.estado === 'Cerrada') {
+                                const fila = document.querySelector('tr[data-incidencia-id="' + mensaje.id + '"]');
+                                if (fila) {
+                                    fila.style.transition = 'opacity 0.5s';
+                                    fila.style.opacity = '0';
+                                    setTimeout(function () {
+                                        fila.remove();
+                                    }, 500);
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Error al procesar mensaje WebSocket:', err);
+                        }
+                    });
+
+                    channel.listen('close', function () {
+                        wasDisconnected = true;
+                        setStatus('🔴 Desconectado — reconectando...', 'bg-danger');
+                        setTimeout(conectar, 3000);
+                    });
+
+                    channel.listen('error', function () {
+                        wasDisconnected = true;
+                        setStatus('🔴 Error de conexión — reconectando...', 'bg-danger');
+                        setTimeout(conectar, 3000);
+                    });
+
+                } catch (err) {
+                    console.error('Error al conectar PieSocket:', err);
+                    wasDisconnected = true;
+                    setStatus('🔴 Error de conexión — reconectando...', 'bg-danger');
+                    setTimeout(conectar, 5000);
+                }
+            }
+
+            conectar();
+        })();
+    </script>
+}
