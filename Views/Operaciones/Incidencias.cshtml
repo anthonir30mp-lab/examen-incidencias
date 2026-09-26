@@ -6,6 +6,13 @@
 
 <h1>Incidencias abiertas en tiempo real</h1>
 
+<form method="get" asp-action="Incidencias" asp-controller="Operaciones" class="mb-3">
+    <div class="input-group">
+        <input type="text" name="query" class="form-control" placeholder="Buscar incidencias..." value="@ViewBag.Query" />
+        <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
+</form>
+
 <div id="connection-status" class="mb-3">
     <span class="badge bg-secondary">⏳ Conectando...</span>
 </div>
